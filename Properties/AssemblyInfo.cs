@@ -27,7 +27,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("diev")]
 [assembly: AssemblyProduct("ACL2readonly")]
-[assembly: AssemblyCopyright("Copyright © 2020-2021 Dmitrii Evdokimov")]
+[assembly: AssemblyCopyright("Copyright © 2020-2023 Dmitrii Evdokimov")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
@@ -49,5 +49,5 @@ using System.Runtime.InteropServices;
 // Можно задать все значения или принять номера сборки и редакции по умолчанию 
 // используя "*", как показано ниже:
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("2.2.0.0")]
-[assembly: AssemblyFileVersion("2.2.0.0")]
+[assembly: AssemblyVersion("4.2023.12.11")]
+[assembly: AssemblyFileVersion("4.2023.12.11")]

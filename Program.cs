@@ -19,11 +19,14 @@ using System;
 using System.Configuration;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Security.Cryptography;
 using System.Security.Principal;
 using System.Text;
+using System.Xml.Linq;
 
 namespace ACL2readonly
 {
@@ -63,7 +66,7 @@ namespace ACL2readonly
 
         private static void Main(string[] args)
         {
-            try
+            //try
             {
                 Console.WriteLine(Banner());
 
@@ -107,13 +110,13 @@ namespace ACL2readonly
 
                 Environment.Exit(0);
             }
-            catch (Exception e)
-            {
-                Console.WriteLine(e.Message);
-                File.AppendAllText(_logE, $"{e}\n\n");
+            //catch (Exception e)
+            //{
+            //    Console.WriteLine(e.Message);
+            //    File.AppendAllText(_logE, $"{e}\n\n");
 
-                Environment.Exit(1);
-            }
+            //    Environment.Exit(1);
+            //}
         }
 
         /// <summary>
@@ -152,6 +155,7 @@ namespace ACL2readonly
 
             string d1 = Path.GetFileName(dir);
             string d2 = d1.Trim();
+            bool safe = true;
 
             while (d2.Contains(".."))
             {
@@ -183,6 +187,12 @@ namespace ACL2readonly
                 d2 = d2.Replace("  ", " ");
             }
 
+            while (d2.EndsWith("."))
+            {
+                d2 = d2.Substring(0, d2.Length - 1);
+                safe = false;
+            }
+
             if (!d2.Equals(d1))
             {
                 string dir2 = Path.Combine(Path.GetDirectoryName(dir), d2);
@@ -191,18 +201,31 @@ namespace ACL2readonly
                 {
                     _renDirsE++;
                     File.AppendAllText(_logE, $"D2! \"{sdir}\"\n");
-                }
-                else
-                {
-                    _renDirs++;
-                    File.AppendAllText(_log, $"ren \"{sdir}\" \"{d2}\"\n");
-                    Directory.Move(dir, dir2);
-                    dir = dir2;
-                    sdir = dir.Substring(_cut) + Path.DirectorySeparatorChar;
 
-                    //_renDirsE++;
-                    //File.AppendAllText(_logE, $"D1! \"{sdir}\"\n");
+                    d2 = GetFreeDirname(d2);
+                    dir2 = Path.Combine(Path.GetDirectoryName(dir), d2);
                 }
+
+                _renDirs++;
+                File.AppendAllText(_log, $"ren \"{sdir}\" \"{d2}\"\n");
+
+                if (safe)
+                {
+                    Directory.Move(dir, dir2);
+                }
+                else if (!RenameDirectoryWithSideWhiteSpaces(dir, dir2))
+                {
+                    _renDirsE++;
+                    File.AppendAllText(_logE, $"DX! \"{sdir}\"\n");
+
+                    return; //TODO bad dir!
+                }
+
+                dir = dir2;
+                sdir = dir.Substring(_cut) + Path.DirectorySeparatorChar;
+
+                //_renDirsE++;
+                //File.AppendAllText(_logE, $"D1! \"{sdir}\"\n");
             }
 
             if (_doRights)
@@ -456,6 +479,24 @@ namespace ACL2readonly
         }
 
         /// <summary>
+        /// Looks for a free dirname with (++counter) if there is same used.
+        /// </summary>
+        /// <param name="file">Dirname to look.</param>
+        /// <returns>New unused dirname.</returns>
+        private static string GetFreeDirname(string dir)
+        {
+            string ext = Path.GetExtension(dir);
+            string name = Path.ChangeExtension(dir, null);
+            int n = 1;
+
+            while (Directory.Exists($"{name} ({++n}){ext}"))
+            {
+            }
+
+            return $"{name} ({n}){ext}";
+        }
+
+        /// <summary>
         /// Looks for a free filename with (++counter) if there is same used.
         /// </summary>
         /// <param name="file">Filename to look.</param>
@@ -471,6 +512,40 @@ namespace ACL2readonly
             }
 
             return $"{name} ({n}){ext}";
+        }
+
+        // https://social.msdn.microsoft.com/Forums/en-US/92f8813f-5dbf-4e67-b8eb-2c91de2a6696/directorynotfoundexception-when-directory-name-ends-with-white-space?forum=csharpgeneral
+
+        [DllImport("kernel32.dll", EntryPoint = "MoveFileW", SetLastError = true, CharSet = CharSet.Unicode, ExactSpelling = true, CallingConvention = CallingConvention.StdCall)]
+        private static extern bool MoveFile(string lpExistingFileName, string lpNewFileName);
+
+        private static bool RenameDirectoryWithSideWhiteSpaces(string path, string newPath)
+        {
+            var oldPath = path.StartsWith(@"\\?\") ? path : @"\\?\" + path;
+            var result = MoveFile(oldPath, newPath);
+
+            return result;
+        }
+
+        private static string RemoveSideWhiteSpaces(string path)
+        {
+            //var parent = Path.GetDirectoryName(path);
+            //var name = Path.GetFileName(path);
+            //var result = Path.Combine(parent ?? Path.GetPathRoot(path), name.Trim());
+
+            var breadcrumbs = path.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).Select(x => x.Trim()).ToArray();
+
+            for (int i = 0; i < breadcrumbs.Length; i++)
+            {
+                while (breadcrumbs[i].EndsWith("."))
+                {
+                    breadcrumbs[i] = breadcrumbs[i].Substring(0, breadcrumbs[i].Length - 1);
+                }
+            }    
+
+            var result = string.Join(@"\", breadcrumbs);
+
+            return result;
         }
     }
 }
